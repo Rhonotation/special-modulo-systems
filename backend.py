@@ -3,12 +3,12 @@ from functools import total_ordering
 
 @total_ordering
 class Piece():
-    def __init__(self, seq=[]):
+    def __init__(self, seq=None):
         '''Initializes self.'''
         self.cells = {0:[0,0]}
         self.len = 1
         self.seq = []
-        if seq != []:
+        if seq:
             self.growseq(seq)
     
     def get_max_x(self):
@@ -36,11 +36,6 @@ class Piece():
                                  [cellloc[0], cellloc[1] + 1],
                                  [cellloc[0], cellloc[1] - 1]])
         # Expansion Complete
-        maxx = self.get_max_x()
-        maxy = self.get_max_y()
-        neighborlist = np.array(neighborlist)
-        neighborlist = neighborlist[(0 <= neighborlist[:, 0]) & (0 <= neighborlist[:, 1])]
-        # Bounds Filtering Complete
         current_cells_set = set(tuple(c) for c in celllocs)
         neighborlist = np.array([n for n in neighborlist if tuple(n) not in current_cells_set])
         # Overlap Filtering Complete
@@ -52,9 +47,14 @@ class Piece():
     
     def grow(self, idx):
         '''Adds neighbor idx to self.'''
-        celllocs = list(self.cells.values())
+        celllocs = np.array(list(self.cells.values()))
         newloc = self.neighbors()[idx]
-        celllocs = np.array(celllocs + [newloc])
+        celllocs = np.append(celllocs, np.array(newloc))
+        if -1 in celllocs[:, 0]: # oob in x:
+            celllocs[:, 0] = celllocs[:, 0] + 1
+        if -1 in celllocs[:, 1]: # oob in y:
+            celllocs[:, 1] = celllocs[:, 1] + 1
+        # Getting rid of the negative coordinates.
         sortorder = np.lexsort((celllocs[:, 0], celllocs[:, 1]))
         self.cells = {i: loc.tolist() for i, loc in enumerate(celllocs[sortorder])}
         self.seq.append(idx)
@@ -92,7 +92,7 @@ class Piece():
         calcs = []
         for a in range(len(self)):
             for b in range(len(self)):
-                calcs.append({[a, b]:self.add(a, b)})
+                calcs.append({(a, b):self.add(a, b)})
         return calcs
     
     def check_commutativity(self):
@@ -133,16 +133,15 @@ class Piece():
         flag = True
         for a in range(len(self)):
             inverse = [((self.add(a, i) == identity) and (self.add(i, a) == identity)) for i in range(len(self))]
-            if sum(inverse) > 0 and sum(inverse) in inverse:
-                inverses.append(sum(inverse))
-                flag = True and flag
+            if inverse.count(True) == 1:
+                inverses.append(inverse.index(True))
             else:
                 inverses.append(-1)
                 flag = False
         return flag, inverses
     
     def check_group(self):
-        return self.check_associativity() and self.check_identity[0] and self.check_invertible[0]
+        return self.check_associativity() and self.check_invertible()[0]
     
     def check_standardness(self):
         # Note: I use "standard" to refer to an operation that is both associative and commutative, like addition or multiplication.
@@ -180,3 +179,16 @@ class Piece():
                 elif sseq[i] > oseq[i]:
                     return False
             return False
+
+class PieceClass():
+    '''Class of pieces.'''
+    def __init__(self, pieces=None):
+        '''Initializes self.'''
+        if pieces:
+            self.pieces = pieces
+        else:
+            self.pieces = []
+
+    def start(self):
+        '''Adds the simplest Piece() to the self.'''
+    
