@@ -1,5 +1,6 @@
 import numpy as np
 from functools import total_ordering
+from collections.abc import Iterable
 
 @total_ordering
 class Piece():
@@ -10,6 +11,14 @@ class Piece():
         self.seq = []
         if seq:
             self.growseq(seq)
+
+    def __str__(self):
+        '''Turns self into a string.'''
+        stringlst = np.array([[" " for _ in range(self.get_max_x() + 1)] for _ in range(self.get_max_y() + 1)])
+        for num, cell in self.cells:
+            stringlst[cell[1], cell[0]] = str(num) # we index y before x
+        string = np.apply_along_axis(lambda x: "\t".join(x), 1, stringlst)
+        return str(self.get_array())
     
     def get_max_x(self):
         '''Returns max x in self.'''
@@ -187,8 +196,17 @@ class PieceClass():
         if pieces:
             self.pieces = pieces
         else:
-            self.pieces = []
+            self.pieces = np.array([])
+    
+    def __add__(self, other):
+        '''Returns the pieces of self, with other.'''
+        if isinstance(other, Iterable):
+            return np.unique(np.append(self.pieces, np.array(other)))
+        else:
+            return np.unique(np.append(self.pieces, np.array([other])))
 
     def start(self):
         '''Adds the simplest Piece() to the self.'''
-    
+        self.pieces = self + Piece()
+
+PC = PieceClass
