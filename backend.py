@@ -198,11 +198,23 @@ class PieceClass():
     def __init__(self, pieces=None):
         '''Initializes self.'''
         if pieces:
-            self.pieces = pieces
+            self.pieces = np.array(pieces)
         else:
             self.pieces = np.array([])
+
+    def __getitem__(self, key:int|Iterable[int]|slice):
+        if isinstance(key, slice):
+            return self.pieces[key]
+        else:
+            if isinstance(key, Iterable) and not isinstance(key, (str, bytes)):
+                return self.pieces[np.array(key)]
+            else:
+                return self.pieces[key]
+
+    def __setitem__(self, key:int|slice, val:Piece|Iterable[Piece]):
+        self.pieces[key] = val
     
-    def __add__(self, other):
+    def __add__(self, other:Piece|Iterable[Piece]|"PieceClass"):
         '''Returns the pieces of self, with other.'''
         if isinstance(other, Iterable):
             return PieceClass(np.unique(np.append(self.pieces, np.array(other))))
@@ -212,10 +224,40 @@ class PieceClass():
             else:
                 return PieceClass(np.unique(np.append(self.pieces, np.array([other]))))
 
+    def __iadd__(self, other:Piece|Iterable[Piece]|"PieceClass"):
+        self.pieces = (self + other).pieces
+        return self
+
+    def __reversed__(self, other):
+        return np.flip(self.pieces())
+
     def __str__(self):
         '''Turns self into a string.'''
         string = "\n--------\n".join([str(p) for p in self.pieces])
         return string
+
+    def __len__(self):
+        '''Gets the length of self.'''
+        return len(self.pieces)
+
+    def __iter__(self):
+        return self.pieces
+
+    def __contains__(self, item):
+        return item in self.pieces
+
+    def __delitem__(self, key):
+        self.pieces = np.append(self.pieces[:key], self.pieces[key + 1:])
+
+    def __repr__(self):
+        return str([str(piece) for piece in self.pieces])
+
+    def __eq__(self, other):
+        if not isinstance(other, PieceClass):
+            return False
+        if len(self.pieces) != len(other.pieces):
+            return False
+        return all(self.pieces[i] == other.pieces[i] for i in range(len(self.pieces)))
 
     def get_grow(self):
         '''Gets pieces to grow self with from its longest values.'''
@@ -227,7 +269,7 @@ class PieceClass():
             neighborcount = len(piece.neighbors())
             for i in range(neighborcount):
                 grownpieces += piece.copy().grow(i)
-        grownpiecesunique = np.unique(grownpieces)
+        grownpiecesunique = PieceClass(np.unique(grownpieces.pieces))
         return grownpiecesunique
 
     def grow(self, iters=1):
@@ -238,3 +280,7 @@ class PieceClass():
     def start(self):
         '''Adds the simplest Piece() to the self.'''
         self.pieces = self + Piece()
+
+TEST = PieceClass()
+TEST.start()
+TEST.grow()
