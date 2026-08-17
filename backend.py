@@ -274,7 +274,8 @@ class PieceClass():
 
     def grow(self, iters=1):
         '''Grows self iters times.'''
-        self += self.get_grow()
+        for _ in range(iters):
+            self += self.get_grow()
         return self
 
     def start(self):
@@ -283,4 +284,5 @@ class PieceClass():
 
 TEST = PieceClass()
 TEST.start()
-TEST.grow()
+TEST.grow(2)
+print(str(TEST))
