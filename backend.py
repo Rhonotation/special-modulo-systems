@@ -25,41 +25,77 @@ class Piece():
         string = np.apply_along_axis(lambda x: "\t".join(x), 1, stringlst)
         return "\n".join(string)
     
-    def classify(self, traits = [0] * 10, recalc = False):
-        '''Returns a tag of self's attributes.'''
-        if self.tag == {}:
-            self.tag['size'] = self.get_len()
-            self.tag['commutative'] = bool(self.check_commutativity())
-            self.tag['associative'] = bool(self.check_associativity())
-            if len(traits) == 10: # all traits present
-                identity_info = self.check_identity()
-                self.tag['has_identity'] = identity_info[0]
-                self.tag['identity'] = identity_info[1]
-                invertibility_info = self.check_invertible()
-                self.tag['invertible'] = invertibility_info[0]
-                self.tag['inverses'] = invertibility_info[1]
-                self.tag['standard'] = self.tag['commutative'] and self.tag['associative']
-                self.tag['group'] = self.tag['associative'] and self.tag['invertible']
-                self.tag['abelian'] = self.tag['group'] and self.tag['commutative']
-            else: # only necessary traits
-                if 'has_identity' in traits or 'identity' in traits:
-                    identity_info = self.check_identity()
-                    if 'has_identity in traits':
-                        self.tag['has_identity'] = identity_info[0]
-                    if 'identity' in traits
-                        self.tag['identity'] = identity_info[1]
-                invertibility_info = self.check_invertible()
-                self.tag['invertible'] = invertibility_info[0]
-                self.tag['inverses'] = invertibility_info[1]
-                self.tag['standard'] = self.tag['commutative'] and self.tag['associative']
-                self.tag['group'] = self.tag['associative'] and self.tag['invertible']
-                self.tag['abelian'] = self.tag['group'] and self.tag['commutative']
-        return self.tag
+    def classify(self, traits=None, recalc=False):
+        """
+        Compute only the requested traits.
+        traits: a set of trait names to compute. If None, compute all.
+        recalc: if True, recompute even if cached.
+        """
+
+        # All possible traits
+        ALL_TRAITS = {
+            'size', 'commutative', 'associative',
+            'has_identity', 'identity',
+            'invertible', 'inverses',
+            'standard', 'group', 'abelian'
+        }
+
+        # Default: compute everything
+        if traits is None:
+            traits = ALL_TRAITS
+        else:
+            traits = set(traits)
+
+        # If cached and not forced to recalc, return only requested traits
+        if (not recalc) and (self.tag != {}):
+            return {t: self.tag[t] for t in traits}
+
+        # Otherwise compute missing traits
+        tag = {}
+
+        if 'size' in traits:
+            tag['size'] = self.get_len()
+
+        if 'commutative' in traits or 'standard' in traits or 'abelian' in traits:
+            tag['commutative'] = bool(self.check_commutativity())
+
+        if 'associative' in traits or 'standard' in traits or 'group' in traits or 'abelian' in traits:
+            tag['associative'] = bool(self.check_associativity())
+
+        if 'has_identity' in traits or 'identity' in traits or 'invertible' in traits or 'group' in traits or 'abelian' in traits:
+            identity_info = self.check_identity()
+            tag['has_identity'] = identity_info[0]
+            tag['identity'] = identity_info[1]
+
+        if 'invertible' in traits or 'inverses' in traits or 'group' in traits or 'abelian' in traits:
+            invertibility_info = self.check_invertible()
+            tag['invertible'] = invertibility_info[0]
+            tag['inverses'] = invertibility_info[1]
+
+        if 'standard' in traits:
+            tag['standard'] = tag.get('commutative', self.check_commutativity()) and \
+                            tag.get('associative', self.check_associativity())
+
+        if 'group' in traits:
+            tag['group'] = tag.get('associative', self.check_associativity()) and \
+                        tag.get('invertible', self.check_invertible()[0])
+
+        if 'abelian' in traits:
+            tag['abelian'] = tag.get('group', self.check_group()) and \
+                            tag.get('commutative', self.check_commutativity())
+
+        # Cache full tag (not just requested subset)
+        # This ensures future calls are fast
+        self.tag.update(tag)
+
+        # Return only requested traits
+        return {t: self.tag[t] for t in traits}
 
     def satisfy(self, traits:dict):
-        self_traits = self.classify(traits.keys(), True)
+        needed = set(traits.keys())
+        computed = self.classify(traits=needed)
         for trait, value in traits.items():
-            if self_traits[trait] != value:
+            if computed[trait] != value:
                 return False
         return True
 
@@ -363,7 +399,7 @@ class PieceClass():
 
 TEST = PieceClass()
 TEST.start()
-TEST.grow(4)
+TEST.grow(5)
 print(len(TEST))
-s = TEST.query({})
+s = TEST.query({'associative': True})
 print(len(s))
