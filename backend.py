@@ -5,13 +5,17 @@ from collections.abc import Iterable
 
 @total_ordering
 class Piece():
-    def __init__(self, seq=None):
+    def __init__(self, seq=None, tag=None):
         '''Initializes self.'''
         self.cells = {0:[0,0]}
         self.len = 1
         self.seq = []
         if seq:
             self.growseq(seq)
+        if tag != None:
+            self.tag = tag
+        else:
+            self.tag = {}
 
     def __str__(self):
         '''Turns self into a string.'''
@@ -21,25 +25,39 @@ class Piece():
         string = np.apply_along_axis(lambda x: "\t".join(x), 1, stringlst)
         return "\n".join(string)
     
-    def classify(self):
+    def classify(self, traits = [0] * 10, recalc = False):
         '''Returns a tag of self's attributes.'''
-        tag = {}
-        tag['size'] = self.get_len()
-        tag['commutative'] = bool(self.check_commutativity())
-        tag['associative'] = bool(self.check_associativity())
-        identity_info = self.check_identity()
-        tag['has_identity'] = identity_info[0]
-        tag['identity'] = identity_info[1]
-        invertibility_info = self.check_invertible()
-        tag['invertible'] = invertibility_info[0]
-        tag['inverses'] = invertibility_info[1]
-        tag['standard'] = tag['commutative'] and tag['associative']
-        tag['group'] = tag['associative'] and tag['invertible']
-        tag['abelian'] = tag['group'] and tag['commutative']
-        return tag
+        if self.tag == {}:
+            self.tag['size'] = self.get_len()
+            self.tag['commutative'] = bool(self.check_commutativity())
+            self.tag['associative'] = bool(self.check_associativity())
+            if len(traits) == 10: # all traits present
+                identity_info = self.check_identity()
+                self.tag['has_identity'] = identity_info[0]
+                self.tag['identity'] = identity_info[1]
+                invertibility_info = self.check_invertible()
+                self.tag['invertible'] = invertibility_info[0]
+                self.tag['inverses'] = invertibility_info[1]
+                self.tag['standard'] = self.tag['commutative'] and self.tag['associative']
+                self.tag['group'] = self.tag['associative'] and self.tag['invertible']
+                self.tag['abelian'] = self.tag['group'] and self.tag['commutative']
+            else: # only necessary traits
+                if 'has_identity' in traits or 'identity' in traits:
+                    identity_info = self.check_identity()
+                    if 'has_identity in traits':
+                        self.tag['has_identity'] = identity_info[0]
+                    if 'identity' in traits
+                        self.tag['identity'] = identity_info[1]
+                invertibility_info = self.check_invertible()
+                self.tag['invertible'] = invertibility_info[0]
+                self.tag['inverses'] = invertibility_info[1]
+                self.tag['standard'] = self.tag['commutative'] and self.tag['associative']
+                self.tag['group'] = self.tag['associative'] and self.tag['invertible']
+                self.tag['abelian'] = self.tag['group'] and self.tag['commutative']
+        return self.tag
 
     def satisfy(self, traits:dict):
-        self_traits = self.classify()
+        self_traits = self.classify(traits.keys(), True)
         for trait, value in traits.items():
             if self_traits[trait] != value:
                 return False
@@ -47,7 +65,7 @@ class Piece():
 
     def copy(self):
         '''Returns a copy of self.'''
-        return Piece(self.seq)
+        return Piece(self.seq, self.tag)
     
     def get_max_x(self):
         '''Returns max x in self.'''
@@ -65,22 +83,22 @@ class Piece():
         return self.len
     
     def neighbors(self):
-        '''Gets neighbors of self.'''
         celllocs = np.array(list(self.cells.values()))
-        neighborlist = []
-        for cellloc in celllocs:
-            neighborlist.extend([[cellloc[0] + 1, cellloc[1]],
-                                 [cellloc[0] - 1, cellloc[1]],
-                                 [cellloc[0], cellloc[1] + 1],
-                                 [cellloc[0], cellloc[1] - 1]])
-        # Expansion Complete
-        current_cells_set = set(tuple(c) for c in celllocs)
-        neighborlist = np.array([n for n in neighborlist if tuple(n) not in current_cells_set])
-        # Overlap Filtering Complete
+
+        # Generate all 4-direction neighbors in one vectorized operation
+        offsets = np.array([[1,0], [-1,0], [0,1], [0,-1]])
+        neighborlist = celllocs[:, None, :] + offsets[None, :, :]
+        neighborlist = neighborlist.reshape(-1, 2)
+
+        # Remove existing cells
+        current = set(map(tuple, celllocs))
+        mask = np.array([tuple(n) not in current for n in neighborlist])
+        neighborlist = neighborlist[mask]
+
+        # Unique + sorted
         neighborlist = np.unique(neighborlist, axis=0)
-        # Uniqueness Filtering Complete
-        neighborlist = neighborlist[np.lexsort((neighborlist[:, 0], neighborlist[:, 1]))]
-        # Sorting Complete
+        neighborlist = neighborlist[np.lexsort((neighborlist[:,0], neighborlist[:,1]))]
+
         return neighborlist.tolist()
     
     def grow(self, idx):
@@ -97,6 +115,7 @@ class Piece():
         self.cells = {i: loc.tolist() for i, loc in enumerate(celllocs[sortorder])}
         self.seq.append(idx)
         self.len += 1
+        self.tag = {}
         return self
     
     def growseq(self, seq):
@@ -329,7 +348,7 @@ class PieceClass():
     def query(self, attribute_query:dict):
         '''Takes an attribute_query, which is a dictionary of wanted traits and their values.
         Then, returns a PieceClass() with every piece in self satisfying those.'''
-        satisfy_pieces = PieceClass([p for p in self.pieces if p.satisfy()])
+        satisfy_pieces = PieceClass([p for p in self.pieces if p.satisfy(attribute_query)])
         return satisfy_pieces
 
     def get_seqs(self):
@@ -344,6 +363,7 @@ class PieceClass():
 
 TEST = PieceClass()
 TEST.start()
-TEST.grow(3) 
-for _ in range(10):
-    print(TEST.random().classify())
+TEST.grow(4)
+print(len(TEST))
+s = TEST.query({})
+print(len(s))
