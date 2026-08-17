@@ -20,8 +20,33 @@ class Piece():
             stringlst[cell[1], cell[0]] = str(num) # we index y before x
         string = np.apply_along_axis(lambda x: "\t".join(x), 1, stringlst)
         return "\n".join(string)
+    
+    def classify(self):
+        '''Returns a tag of self's attributes.'''
+        tag = {}
+        tag['size'] = self.get_len()
+        tag['commutative'] = bool(self.check_commutativity())
+        tag['associative'] = bool(self.check_associativity())
+        identity_info = self.check_identity()
+        tag['has_identity'] = identity_info[0]
+        tag['identity'] = identity_info[1]
+        invertibility_info = self.check_invertible()
+        tag['invertible'] = invertibility_info[0]
+        tag['inverses'] = invertibility_info[1]
+        tag['standard'] = tag['commutative'] and tag['associative']
+        tag['group'] = tag['associative'] and tag['invertible']
+        tag['abelian'] = tag['group'] and tag['commutative']
+        return tag
+
+    def satisfy(self, traits:dict):
+        self_traits = self.classify()
+        for trait, value in traits:
+            if self_traits[trait] != value:
+                return False
+        return True
 
     def copy(self):
+        '''Returns a copy of self.'''
         return Piece(self.seq)
     
     def get_max_x(self):
@@ -217,24 +242,26 @@ class PieceClass():
     
     def __add__(self, other:Piece|Iterable[Piece]| PieceClass, detectunique = False): # type: ignore
         '''Returns the pieces of self, with other.'''
-        if isinstance(other, Iterable):
+        if isinstance(other, PieceClass):
+            if detectunique:
+                returnval = PieceClass(np.unique(np.append(self.pieces, other.pieces)))
+            else:
+                returnval = PieceClass(np.append(self.pieces, other.pieces))
+        elif isinstance(other, Piece):
+            # We have a piece!
+            if other in self:
+                returnval = PieceClass(self.pieces)
+            else:
+                returnval = PieceClass(np.append(self.pieces, other))
+        elif isinstance(other, Iterable):
             if detectunique:
                 returnval = PieceClass(np.unique(np.append(self.pieces, other)))
             else:
                 returnval = PieceClass(np.append(self.pieces, other))
-        else:
-            if isinstance(other, PieceClass):
-                if detectunique:
-                    returnval = PieceClass(np.unique(np.append(self.pieces, other.pieces)))
-                else:
-                    returnval = PieceClass(np.append(self.pieces, other.pieces))
-            else:
-                # We have a piece!
-                if other in self:
-                    returnval = PieceClass(self.pieces)
-                else:
-                    returnval = PieceClass(np.append(self.pieces, other))
-        return returnval
+        try:
+            return returnval
+        except BaseException:
+            raise TypeError(f"other must be a Piece(), an Iterable of Piece()s, or a PieceClass(), but it is of {str(type(other))[1:-1]}.")
 
     def __iadd__(self, other:Piece|Iterable[Piece]| PieceClass ): # type: ignore
         self.pieces = (self + other).pieces
@@ -295,7 +322,28 @@ class PieceClass():
         '''Adds the simplest Piece() to the self.'''
         self += Piece()
 
+    def random(self):
+        '''Returns a random element of self.'''
+        return np.random.choice(self.pieces)
+
+    def query(self, attribute_query:dict):
+        '''Takes an attribute_query, which is a dictionary of wanted traits and their values.
+        Then, returns a PieceClass() with every piece in self satisfying those.'''
+        satisfy_pieces = PieceClass([p for p in self.pieces if p.satisfy()])
+        return satisfy_pieces
+
+    def get_seqs(self):
+        '''Gets the sequences of the Piece()s of self.'''
+        seqs = [p.seq for p in self.pieces]
+        return seqs
+
+    def get_matrices(self):
+        '''Gets the matrices of the Piece()s of self.'''
+        matrices = [p.get_array().tolist() for p in self.pieces]
+        return matrices
+
 TEST = PieceClass()
 TEST.start()
-TEST.grow(3)
-print(len(TEST))
+TEST.grow(3) 
+for _ in range(10):
+    print(TEST.random().classify())
