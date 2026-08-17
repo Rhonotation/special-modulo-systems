@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from functools import total_ordering
 from collections.abc import Iterable
@@ -195,9 +196,9 @@ class Piece():
 
 class PieceClass():
     '''Class of pieces.'''
-    def __init__(self, pieces=None):
+    def __init__(self, pieces=[]):
         '''Initializes self.'''
-        if pieces:
+        if len(pieces) > 0:
             self.pieces = np.array(pieces)
         else:
             self.pieces = np.array([])
@@ -214,22 +215,33 @@ class PieceClass():
     def __setitem__(self, key:int|slice, val:Piece|Iterable[Piece]):
         self.pieces[key] = val
     
-    def __add__(self, other:Piece|Iterable[Piece]|"PieceClass"):
+    def __add__(self, other:Piece|Iterable[Piece]| PieceClass, detectunique = False): # type: ignore
         '''Returns the pieces of self, with other.'''
         if isinstance(other, Iterable):
-            return PieceClass(np.unique(np.append(self.pieces, np.array(other))))
+            if detectunique:
+                returnval = PieceClass(np.unique(np.append(self.pieces, other)))
+            else:
+                returnval = PieceClass(np.append(self.pieces, other))
         else:
             if isinstance(other, PieceClass):
-                return PieceClass(np.unique(np.append(self.pieces, other.pieces)))
+                if detectunique:
+                    returnval = PieceClass(np.unique(np.append(self.pieces, other.pieces)))
+                else:
+                    returnval = PieceClass(np.append(self.pieces, other.pieces))
             else:
-                return PieceClass(np.unique(np.append(self.pieces, np.array([other]))))
+                # We have a piece!
+                if other in self:
+                    returnval = PieceClass(self.pieces)
+                else:
+                    returnval = PieceClass(np.append(self.pieces, other))
+        return returnval
 
-    def __iadd__(self, other:Piece|Iterable[Piece]|"PieceClass"):
+    def __iadd__(self, other:Piece|Iterable[Piece]| PieceClass ): # type: ignore
         self.pieces = (self + other).pieces
         return self
 
-    def __reversed__(self, other):
-        return np.flip(self.pieces())
+    def __reversed__(self):
+        return iter(np.flip(self.pieces))
 
     def __str__(self):
         '''Turns self into a string.'''
@@ -241,7 +253,7 @@ class PieceClass():
         return len(self.pieces)
 
     def __iter__(self):
-        return self.pieces
+        return iter(self.pieces)
 
     def __contains__(self, item):
         return item in self.pieces
@@ -265,12 +277,13 @@ class PieceClass():
         growfromlen = np.max(lengths)
         growpieces = self.pieces[np.where(lengths == growfromlen)]
         grownpieces = PieceClass()
+        nsum = 0
         for piece in growpieces:
             neighborcount = len(piece.neighbors())
+            nsum += neighborcount
             for i in range(neighborcount):
                 grownpieces += piece.copy().grow(i)
-        grownpiecesunique = PieceClass(np.unique(grownpieces.pieces))
-        return grownpiecesunique
+        return grownpieces
 
     def grow(self, iters=1):
         '''Grows self iters times.'''
@@ -280,9 +293,9 @@ class PieceClass():
 
     def start(self):
         '''Adds the simplest Piece() to the self.'''
-        self.pieces = self + Piece()
+        self += Piece()
 
 TEST = PieceClass()
 TEST.start()
-TEST.grow(2)
-print(str(TEST))
+TEST.grow(3)
+print(len(TEST))
