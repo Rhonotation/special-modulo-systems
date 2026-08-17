@@ -40,7 +40,7 @@ class Piece():
 
     def satisfy(self, traits:dict):
         self_traits = self.classify()
-        for trait, value in traits:
+        for trait, value in traits.items():
             if self_traits[trait] != value:
                 return False
         return True
