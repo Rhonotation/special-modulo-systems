@@ -19,6 +19,9 @@ class Piece():
             stringlst[cell[1], cell[0]] = str(num) # we index y before x
         string = np.apply_along_axis(lambda x: "\t".join(x), 1, stringlst)
         return "\n".join(string)
+
+    def copy(self):
+        return Piece(self.seq)
     
     def get_max_x(self):
         '''Returns max x in self.'''
@@ -68,6 +71,7 @@ class Piece():
         self.cells = {i: loc.tolist() for i, loc in enumerate(celllocs[sortorder])}
         self.seq.append(idx)
         self.len += 1
+        return self
     
     def growseq(self, seq):
         '''Grows self with seq of neighbor idxs.'''
@@ -201,23 +205,36 @@ class PieceClass():
     def __add__(self, other):
         '''Returns the pieces of self, with other.'''
         if isinstance(other, Iterable):
-            return np.unique(np.append(self.pieces, np.array(other)))
+            return PieceClass(np.unique(np.append(self.pieces, np.array(other))))
         else:
-            return np.unique(np.append(self.pieces, np.array([other])))
+            if isinstance(other, PieceClass):
+                return PieceClass(np.unique(np.append(self.pieces, other.pieces)))
+            else:
+                return PieceClass(np.unique(np.append(self.pieces, np.array([other]))))
 
     def __str__(self):
         '''Turns self into a string.'''
-        string = "\n--------\n".join(str(p) for p in self.pieces)
-        print(f"String {string}")
+        string = "\n--------\n".join([str(p) for p in self.pieces])
         return string
 
+    def get_grow(self):
+        '''Gets pieces to grow self with from its longest values.'''
+        lengths = np.array([p.get_len() for p in self.pieces])
+        growfromlen = np.max(lengths)
+        growpieces = self.pieces[np.where(lengths == growfromlen)]
+        grownpieces = PieceClass()
+        for piece in growpieces:
+            neighborcount = len(piece.neighbors())
+            for i in range(neighborcount):
+                grownpieces += piece.copy().grow(i)
+        grownpiecesunique = np.unique(grownpieces)
+        return grownpiecesunique
+
+    def grow(self, iters=1):
+        '''Grows self iters times.'''
+        self += self.get_grow()
+        return self
 
     def start(self):
         '''Adds the simplest Piece() to the self.'''
         self.pieces = self + Piece()
-
-PC = PieceClass()
-PC.start()
-PC.start()
-PC = PC + Piece([1, 1, 1, 1, 2, 2, 1])
-print(str(PC))
