@@ -1,0 +1,25 @@
+/* styles.css */
+body {
+    background: #eff;
+    font-family: Merriweather, serif;
+    font-size: 18px;
+}
+.headertext-main {
+    text-align: center;
+}
+.system-placard-container {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background-color: rgb(38, 239, 202);
+    padding: 10px;
+    row-gap: 10px;
+    column-gap: 10px;
+    border-radius: 5px;
+}
+.system-placard-container div {
+    background-color: #eff;
+    border-radius: 5px;
+    aspect-ratio: 1 / 1;
+    text-align: center;
+    padding: 5px;
+}

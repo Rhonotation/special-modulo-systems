@@ -16,6 +16,7 @@ class Piece():
             self.tag = tag
         else:
             self.tag = {}
+        self.calcs = self.get_calcs()
 
     def __str__(self):
         '''Turns self into a string.'''
@@ -137,7 +138,7 @@ class Piece():
 
         return neighborlist.tolist()
     
-    def grow(self, idx):
+    def grow(self, idx, recalc=True):
         '''Adds neighbor idx to self.'''
         celllocs = np.array(list(self.cells.values()))
         newloc = self.neighbors()[idx]
@@ -152,13 +153,16 @@ class Piece():
         self.seq.append(idx)
         self.len += 1
         self.tag = {}
+        if recalc:
+            self.calcs = self.get_calcs()
         return self
     
     def growseq(self, seq):
         '''Grows self with seq of neighbor idxs.'''
-        for num in seq:
-            self.grow(num)
-        self.seq.extend(seq)
+        if len(seq) > 0:
+            for num in seq:
+                self.grow(num, recalc=False)
+            self.calcs = self.get_calcs()
     
     def get_array(self):
         array = np.zeros((self.get_max_x() + 1, self.get_max_y() + 1))
@@ -173,7 +177,7 @@ class Piece():
         loc = self.cells[value]
         col = array[loc[0]]
         row = array[:, loc[1]]
-        return (np.sum(col) + np.sum(row)) % self.len
+        return (np.sum(col) + np.sum(row)) % self.get_len()
     
     def add(self, a, b):
         '''Adds a and b.'''
@@ -182,27 +186,30 @@ class Piece():
             b -= 1
         return a
     
-    def get_calcs(self):
-        calcs = []
-        for a in range(len(self)):
-            for b in range(len(self)):
-                calcs.append({(a, b):self.add(a, b)})
-        return calcs
+    def get_incs(self):
+        incs = np.array([self.inc(a) for a in range(self.len)])
+        return incs
     
+    def get_calcs(self):
+        calcs = np.zeros((self.len, self.len), dtype=int)
+        calcs[0] = np.arange(self.len)
+        if self.len > 1:
+            calcs[1] = self.get_incs()
+        for i in range(2, self.len):
+            calcs[i] = np.array([self.inc(calcs[i-1][b]) for b in range(self.len)])
+        return calcs
+
     def check_commutativity(self):
-        flag = True
-        for a in range(len(self)):
-            for b in range(a):
-                flag = (self.add(a,b) == self.add(b,a)) and flag
-        return flag
+        return np.all(self.calcs == self.calcs.T)
     
     def check_associativity(self):
-        flag = True
+        calcs = self.calcs
         for a in range(len(self)):
             for b in range(len(self)):
                 for c in range(len(self)):
-                    flag = (self.add(self.add(a,b),c) == self.add(a,self.add(b,c))) and flag
-        return flag
+                    if calcs[calcs[a,b],c] != calcs[a,calcs[b,c]]:
+                        return False
+        return True
 
     def check_identity(self):
         flag = False
@@ -245,7 +252,7 @@ class Piece():
         return self.check_group() and self.check_commutativity()
     
     def __len__(self):
-        return self.get_len()
+        return len(self.seq)
     
     def __eq__(self, other):
         if not isinstance(other, Piece):
@@ -397,9 +404,7 @@ class PieceClass():
         matrices = [p.get_array().tolist() for p in self.pieces]
         return matrices
 
-TEST = PieceClass()
-TEST.start()
-TEST.grow(5)
-print(len(TEST))
-s = TEST.query({'associative': True})
-print(len(s))
+    def repgrow(self, iters=1):
+        for _ in range(iters):
+            self.pieces = self.get_grow().pieces
+        return self
